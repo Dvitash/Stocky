@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.material3.Surface
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -19,7 +18,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            StockyApp() // Entry point for our NavHost and screens
+            StockyApp()
         }
     }
 }
@@ -33,7 +32,6 @@ fun StockyNavGraph(navController: NavHostController) {
         composable(route = Screen.Main.route) {
             MainScreen(
                 onStockClick = { symbol ->
-                    // Navigate to Detail screen with a stock symbol argument
                     navController.navigate("${Screen.Detail.route}/$symbol")
                 },
                 onNavigateToSearch = {
@@ -48,7 +46,6 @@ fun StockyNavGraph(navController: NavHostController) {
             )
         }
 
-        // Detail screen route includes a path argument for stock symbol
         composable(route = Screen.Detail.routeWithArgument) { navBackStackEntry ->
             val symbol = navBackStackEntry.arguments?.getString("symbol").orEmpty()
             DetailScreen(
