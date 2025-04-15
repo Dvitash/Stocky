@@ -1,5 +1,6 @@
 package com.example.stocky.models
 
+import android.util.Log
 import androidx.lifecycle.*
 import com.example.stocky.QuoteResponse
 import com.example.stocky.Stock
@@ -18,10 +19,18 @@ class DetailViewModel(private val repository: StockData) : ViewModel() {
 
     fun loadStockDetails(symbol: String) {
         viewModelScope.launch {
+            Log.d("DetailViewModel", "Loading details for $symbol...")
             _isLoading.value = true
-            _stock.value = repository.getStockDetails(symbol)
-            _quote.value = repository.getQuote(symbol)
+            try {
+                Log.d("DetailViewModel", "Fetching stock details for $symbol")
+                _stock.value = repository.getStockDetails(symbol)
+                Log.d("DetailViewModel", "Fetching quote for $symbol")
+                _quote.value = repository.getQuote(symbol)
+            } catch (e: Exception) {
+                Log.e("DetailViewModel", "Error loading details for $symbol", e)
+            }
             _isLoading.value = false
+            Log.d("DetailViewModel", "Finished loading details for $symbol")
         }
     }
 }

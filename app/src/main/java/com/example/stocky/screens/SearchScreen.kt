@@ -17,21 +17,29 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -40,7 +48,18 @@ import com.example.stocky.Stock
 import com.example.stocky.StockData
 import com.example.stocky.models.SearchViewModel
 import com.example.stocky.ui.ViewModelFactory
+import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarHostState
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchScreen(
     onNavigateBack: () -> Unit,
@@ -60,68 +79,104 @@ fun SearchScreen(
     var loading by remember { mutableStateOf(false) }
     val searchResults by viewModel.searchResults.observeAsState(emptyList())
 
-    // Stop loading when results update
+    val snackbarHostState by remember { mutableStateOf(SnackbarHostState()) }
+    val coroutineScope = rememberCoroutineScope()
+
     LaunchedEffect(searchResults) {
         if (loading) loading = false
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Button(onClick = { onNavigateBack() }) {
-            Text(text = "Back to Main")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            label = { Text("Search for a stock") },
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
-        ) {
-            Button(
-                onClick = {
-                    loading = true
-                    viewModel.searchStocks(query)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add Stocks", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 }
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Search for a stock") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Clear")
+                        }
+                    }
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(text = "Search")
+                Button(
+                    onClick = {
+                        loading = true
+                        viewModel.searchStocks(query)
+                    },
+                    enabled = query.isNotBlank() && !loading
+                ) {
+                    Text(text = "Search")
+                }
             }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        if (loading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(searchResults ?: emptyList()) { stock ->
-                    val isInWatchlist = watchlistSymbols.contains(stock.symbol)
-                    StockListItem(
-                        stock = stock,
-                        isInWatchlist = isInWatchlist,
-                        onAdd = { viewModel.addStockToWatchlist(stock.symbol) },
-                        onRemove = { viewModel.removeStockFromWatchlist(stock.symbol) }
-                    )
+            Spacer(modifier = Modifier.height(16.dp))
+            when {
+                loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+                searchResults?.isEmpty() == true && query.isNotBlank() -> {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("No results found.", color = Color.Gray, fontSize = 16.sp)
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        items(searchResults.orEmpty()) { stock ->
+                            val isInWatchlist = watchlistSymbols.contains(stock.symbol)
+                            StockListItem(
+                                stock = stock,
+                                isInWatchlist = isInWatchlist,
+                                onAdd = {
+                                    viewModel.addStockToWatchlist(stock.symbol)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Added ${stock.symbol} to watchlist")
+                                    }
+                                },
+                                onRemove = {
+                                    viewModel.removeStockFromWatchlist(stock.symbol)
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Removed ${stock.symbol} from watchlist")
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -138,14 +193,15 @@ fun StockListItem(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(7.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(18.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -155,27 +211,26 @@ fun StockListItem(
                 Text(
                     text = stock.symbol,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
                 )
                 Text(
                     text = stock.description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clickable { if (isInWatchlist) onRemove() else onAdd() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (isInWatchlist) "✕" else "+",
-                    color = if (isInWatchlist) Color.Gray else Color(0xFF4CAF50), // Green for +
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            Spacer(modifier = Modifier.width(12.dp))
+            if (isInWatchlist) {
+                IconButton(onClick = onRemove) {
+                    Icon(Icons.Filled.Check, contentDescription = "Remove from Watchlist", tint = Color(0xFF4CAF50))
+                }
+            } else {
+                IconButton(onClick = onAdd) {
+                    Icon(Icons.Filled.Add, contentDescription = "Add to Watchlist", tint = MaterialTheme.colorScheme.primary)
+                }
             }
         }
     }
